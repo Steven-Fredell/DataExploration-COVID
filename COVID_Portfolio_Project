@@ -1,0 +1,71 @@
+SELECT location, population, MAX(total_deaths) AS highest_infection_rate, MAX((total_deaths)/population)*100 AS infection_rate
+FROM PortfolioProject.CovidDeaths
+GROUP BY location, population
+ORDER BY infection_rate DESC
+
+
+SELECT location, MAX(CAST(total_deaths AS int)) AS highest_infection_rate, (MAX(total_deaths)/population)*100 AS death_rate
+FROM PortfolioProject.CovidDeaths
+WHERE continent IS null
+GROUP BY location, population
+ORDER BY death_rate DESC
+
+
+SELECT continent, MAX(CAST(total_deaths AS int)) AS total_death_count
+FROM PortfolioProject.CovidDeaths
+WHERE continent IS NOT null
+GROUP BY location, continent
+ORDER BY total_death_count DESC
+
+
+--GLOBAL NUMBERS
+
+SELECT continent, MAX(CAST(total_deaths AS int)) AS total_death_count
+FROM PortfolioProject.CovidDeaths
+WHERE continent IS NOT null
+GROUP BY continent
+ORDER BY total_death_count DESC
+
+SELECT SUM(new_cases) AS sum_cases, SUM(CAST(new_deaths as int)) AS sum_deaths, SUM(CAST(new_deaths as INT))/SUM(new_cases)*100 AS death_rate
+FROM PortfolioProject.CovidDeaths
+WHERE continent IS NOT null
+GROUP BY date 
+ORDER BY 1,2
+
+--Looking at Population vs Vaccinations
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CAST(vac.new_vaccinations as INT)) OVER (Partition by dea.location ORDER BY dea.location, dea.date) AS rolling_vaccine_count,
+FROM PortfolioProject.CovidDeaths dea
+JOIN PortfolioProject.CovidVaccinations vac
+  ON dea.location = vac.location AND dea.date = vac.date
+WHERE dea.continent IS NOT null
+ORDER BY 2,3
+
+CREATE TEMP TABLE PercentPopulationVaccinated 
+(continent string, 
+location string,
+date datetime,
+population int, 
+new_vaccinations int,
+rolling_vaccine_count int);
+
+INSERT INTO PercentPopulationVaccinated
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CAST(vac.new_vaccinations as INT)) OVER (Partition by dea.location ORDER BY dea.location, dea.date) AS rolling_vaccine_count --(rolling_vaccine_count/dea.population)*100 AS percent_population_vaccinated
+FROM PortfolioProject.CovidDeaths dea
+JOIN PortfolioProject.CovidVaccinations vac
+  ON dea.location = vac.location AND dea.date = vac.date;
+--WHERE dea.continent IS NOT null;
+
+SELECT *, (rolling_vaccine_count/population)*100 AS percent_population_vaccinated
+FROM PercentPopulationVaccinated;
+
+
+CREATE VIEW PortfolioProject.PercentPopulationVaccinated AS 
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CAST(vac.new_vaccinations as INT)) OVER (Partition by dea.location ORDER BY dea.location, dea.date) AS rolling_vaccine_count --(rolling_vaccine_count/dea.population)*100 AS percent_population_vaccinated
+FROM PortfolioProject.CovidDeaths dea
+JOIN PortfolioProject.CovidVaccinations vac
+  ON dea.location = vac.location AND dea.date = vac.date;
+--WHERE dea.continent IS NOT null;
